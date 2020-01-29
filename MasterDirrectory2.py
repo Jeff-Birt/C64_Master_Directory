@@ -29,7 +29,7 @@ canvasDlg.create_window(150, 130, window=browseButton_CSV)
 
 def convertToExcel ():
     global source_path
-    disk_header = ('Size', 'File Name', 'Type')
+    disk_header = ('Size', 'File Name', 'Type', 'MD5 Hash')
     filename = os.fsdecode(source_path)
     head, tail = os.path.split(os.path.dirname(source_path))
     last_file = ""
@@ -37,16 +37,19 @@ def convertToExcel ():
     worksheet_index = 1
 
     wb = xlsxwriter.Workbook('Disk Master Directory.xlsx')
+    #cell_format1 = wb.add_format({'bold': True, 'font_name': 'C64 Pro Mono'})
     cell_format1 = wb.add_format({'bold': True})
+    #cell_format2 = wb.add_format({'bg_color': 'yellow', 'font_name': 'C64 Pro Mono'})
     cell_format2 = wb.add_format({'bg_color': 'yellow'})
-    master_header = ('Name', 'Path', 'Sheet#', 'Directory Hash')
+    master_header = ('Name', 'Path', 'Sheet#', 'Directory Hash', 'Duplicate')
     master_sheet = wb.add_worksheet("Master_Index")
     master_link = 'internal:' + master_sheet.name + '!A1'
     master_sheet.write_row('A1', master_header, cell_format1)
     master_sheet.set_column('A:A', 22)
     master_sheet.set_column('B:B', 40)
     master_sheet.set_column('C:C', 8)
-    master_sheet.set_column('D:D', 65)
+    master_sheet.set_column('D:D', 34)
+    master_sheet.set_column('E:E', 10)
     master_sheet.conditional_format('D1:D1048576', {'type': 'duplicate', 'format':cell_format2})
     master_index = 0
     
@@ -62,7 +65,7 @@ def convertToExcel ():
                             if last_file != val:
                                 master_index +=1
                                 last_file = val
-                                m = hashlib.sha256()
+                                m = hashlib.md5()
                                 name = os.path.basename(last_file)
                                 rel_path = os.path.relpath(last_file, head)
                                 worksheet_name = "Image" + str(worksheet_index)
@@ -82,7 +85,8 @@ def convertToExcel ():
                                 sh.write_row('A4', disk_header, cell_format1)
                                 sh.set_column('A:A', 8)
                                 sh.set_column('B:B', 20)
-                                sh.set_column('C:C', 8)
+                                sh.set_column('C:C', 10)
+                                sh.set_column('D:D', 34)
                                 write_row_index = 4
                                 worksheet_index += 1
                         else:
@@ -94,6 +98,8 @@ def convertToExcel ():
                                 sh.write(write_row_index, c-1, val)
                                 m.update(val.encode('utf-8'))
                                 master_sheet.write(master_index, 3, m.hexdigest())
+                                form = '=COUNTIF(D:D, ' + 'D' + str(master_index+1) + ')>1'
+                                master_sheet.write_formula(master_index, 4, form)
             
     wb.close()
     
