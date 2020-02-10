@@ -29,14 +29,15 @@ canvasDlg.create_window(150, 130, window=browseButton_CSV)
 
 def convertToExcel ():
     global source_path
-    disk_header = ('Size', 'File Name', 'Type', 'MD5 Hash')
+    disk_header = ('Size', 'File Name', 'Type', 'MD5 Hash', 'File #')
     filename = os.fsdecode(source_path)
     head, tail = os.path.split(os.path.dirname(source_path))
     last_file = ""
     write_row_index  = 1
     worksheet_index = 1
 
-    wb = xlsxwriter.Workbook('Disk Master Directory.xlsx')
+    wb = xlsxwriter.Workbook('Disk_Master_Directory.xlsm')
+    wb.add_vba_project('./vbaProject.bin')
     #cell_format1 = wb.add_format({'bold': True, 'font_name': 'C64 Pro Mono'})
     cell_format1 = wb.add_format({'bold': True})
     #cell_format2 = wb.add_format({'bg_color': 'yellow', 'font_name': 'C64 Pro Mono'})
@@ -49,8 +50,10 @@ def convertToExcel ():
     master_sheet.set_column('B:B', 40)
     master_sheet.set_column('C:C', 8)
     master_sheet.set_column('D:D', 34)
-    master_sheet.set_column('E:E', 10)
+    master_sheet.set_column('E:E', 15)
     master_sheet.conditional_format('D1:D1048576', {'type': 'duplicate', 'format':cell_format2})
+    master_sheet.insert_button('E1', {'macro': 'DupDir',
+                                    'caption': 'Duplicates', 'width': 110, 'height': 20})
     master_index = 0
     
     #maybe keep track of disk names and add to 1st 'master' worksheet?
@@ -77,16 +80,19 @@ def convertToExcel ():
 
                                 sh = wb.add_worksheet(worksheet_name)
                                 sh.write_url('A1', master_link, string='Index')
-                                sh.write('B1', 'Directory Hash')
+                                #sh.write('B1', 'Directory Hash')
                                 sh.write('A2', 'Name', cell_format1)
                                 sh.write('B2', name)
                                 sh.write('C2', 'Path', cell_format1)
                                 sh.write('D2', rel_path)
+                                sh.write('E2', '#Entries', cell_format1)
                                 sh.write_row('A4', disk_header, cell_format1)
                                 sh.set_column('A:A', 8)
                                 sh.set_column('B:B', 20)
                                 sh.set_column('C:C', 10)
                                 sh.set_column('D:D', 34)
+                                sh.insert_button('F4', {'macro': 'Toggle',
+                                    'caption': 'Duplicates', 'width': 110, 'height': 20})
                                 write_row_index = 4
                                 worksheet_index += 1
                         else:
@@ -95,7 +101,11 @@ def convertToExcel ():
                                 m.update(val.encode('utf-8'))
                                 master_sheet.write(master_index, 3, m.hexdigest())
                             else:
-                                sh.write(write_row_index, c-1, val)
+                                sh.write(write_row_index, c-1, val) #column data
+                                sh.write_number('F2', write_row_index-3) # total files
+                                sh.write_number(write_row_index, 4, write_row_index-3) # File# Index
+                                hashForm = '=IF(COUNT(F4:F4)=1,HashMatch(D' + str(write_row_index+1) + '))'
+                                sh.write_formula(write_row_index, 5, hashForm) # file hash dup check 
                                 m.update(val.encode('utf-8'))
                                 master_sheet.write(master_index, 3, m.hexdigest())
                                 form = '=COUNTIF(D:D, ' + 'D' + str(master_index+1) + ')>1'

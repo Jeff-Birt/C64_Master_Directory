@@ -1,0 +1,120 @@
+
+Extract VBA from XLSM file: vba_extract.py Disk_Master_Directory_D.xlsm
+
+
+' On MasterDirectory sheet conditional formatting checks MD5 matches on disk image directories (not files)
+' The Duplicates button applies/removes an autofilter to collapse display to only show matches
+Sub DupDir()
+
+    If Not ActiveSheet.AutoFilterMode Then
+        Columns("E:E").Select
+        Selection.AutoFilter
+        ActiveSheet.Range("$E$1:$E$5").AutoFilter Field:=1, Criteria1:="TRUE"
+    Else
+        ActiveSheet.AutoFilterMode = False
+    End If
+    
+End Sub
+
+
+' Toggles a cell under the 'Duplicates' button on the disk image sheets, which acts like
+' a flag to enable forumula enbdeed in column F which will do a hash match for each directory entry
+Sub Toggle()
+
+    If IsEmpty(ActiveSheet.Range("F4:F4")) Then
+        ActiveSheet.Range("F4:F4").Value = 1
+    Else
+        ActiveSheet.Range("F4:F4").ClearContents
+    End If
+    
+End Sub
+
+' Called from each directory row of each disk image sheet, forumla that calls enabled by 'Duplicates' button
+' checks MD5 hash of each file on current sheet to every other sheet and displays the number of matches
+Public Function HashMatch(CompareFromHash As String)
+    Dim val As Integer
+    Dim CompareToRange As Range
+    Dim NumDirEntTo As Integer
+    Dim vRes As Variant
+    DirCountRow = 2
+    DirCountCol = 6
+    WS_Count = Worksheets.Count
+    val = 0
+    
+    For SheetCompTo = 2 To WS_Count
+        NumDirEntTo = Worksheets(SheetCompTo).Cells(DirCountRow, DirCountCol).Value + 4
+        If ActiveSheet.Name <> Worksheets(SheetCompTo).Name Then
+            Set CompareToRange = Range(Worksheets(SheetCompTo).Cells(5, 4), Worksheets(SheetCompTo).Cells(NumDirEntTo, 5))
+            vRes = Application.VLookup(CompareFromHash, CompareToRange, 2, False)
+            
+            If IsError(vRes) = False Then
+                val = val + 1
+                HashMatch = HashMatch & Worksheets(SheetCompTo).Name & "." & vRes & Chr(10)
+            End If
+        End If
+    Next SheetCompTo
+    
+    HashMatch = CStr(val) & " Matches" & Chr(10) & HashMatch
+End Function
+
+' Displays list of sheets with matching MD5 files hashes in a text box
+' Text box aligned with top of button clicked and linked to Clumn G on same row
+Sub ListMatches()
+
+    Dim ButtonName As String
+    
+    ButtonName = ActiveSheet.Shapes(Application.Caller).TopLeftCell.Address
+    AddTextBox (ButtonName)
+    
+End Sub
+
+' Adds a text box on row where button was pressed linked to column G on same row
+Sub AddTextBox(ButtonName As String)
+
+    Dim textBox As Object
+    Dim buttonPosition As String
+    Dim btnAddSplit() As String
+    Dim tbAddSplit() As String
+
+    buttonPosition = ActiveSheet.Shapes(Application.Caller).TopLeftCell.Address
+    buttonAddSplit = SplitAddress(buttonPosition)
+
+    ' make sure string array is intialized, clunky but works
+    tbAddSplit = Split(" , , ", ",")
+    If ExistsWidget("MyTB") Then
+        tbAddSplit = SplitAddress(ActiveSheet.Shapes("MyTB").TopLeftCell.Address)
+        ActiveSheet.Shapes("MyTB").Delete
+    End If
+
+    ' If the button clicked was on a different row than last button add new TB
+    If tbAddSplit(2) <> buttonAddSplit(2) Then
+        Set textBox = ActiveSheet.OLEObjects.Add(ClassType:="Forms.TextBox.1")
+        With textBox
+            .Name = "MyTB"
+            .LinkedCell = "$F$" & buttonAddSplit(2)
+            .Left = ActiveSheet.Range("H5").Left + 20
+            .Top = ActiveSheet.Range(buttonPosition).Top
+            .Width = 100
+            .Height = 200
+            .Object.MultiLine = True
+            .Object.ForeColor = RGB(0, 0, 255)
+        End With
+    End If
+    
+End Sub
+
+' Simple helper to let us know if a named object exists
+Public Function ExistsWidget(ByVal Name As String) As Boolean
+    
+    On Error Resume Next
+        ExistsWidget = Not ActiveSheet.Shapes(Name) Is Nothing
+    On Error GoTo 0
+    
+End Function
+
+' Simple heper to split a cell addres to a row and column
+Private Function SplitAddress(objAddress As String) As String()
+    
+    SplitAddress = Split(objAddress, "$")
+    
+End Function
